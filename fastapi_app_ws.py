@@ -56,6 +56,7 @@ async def chat_ws(websocket: WebSocket):
                     await websocket.send_text(event.delta)
 
         await websocket.send_text("[DONE]")
+        await websocket.close()
 
     except WebSocketDisconnect:
         print("🔴 Cliente desconectado")
