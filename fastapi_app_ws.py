@@ -1,18 +1,52 @@
-import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+#import asyncio
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
+
+from auth import create_access_token
+from models import LoginRequest, TokenResponse
+from jose import jwt, JWTError
 
 load_dotenv()
 
 app = FastAPI()
 client = AsyncOpenAI()
 
+security = HTTPBearer()
+
 SYSTEM_PROMPT = """
 Eres un asistente legal especializado en derecho peruano.
 Responde únicamente usando la Constitución del Perú y normas legales vigentes.
 Si no hay información, responde que no se encuentra disponible.
 """
+
+
+@app.post("/login", response_model=TokenResponse)
+def login(data: LoginRequest):
+    # ⚠️ SIMULACIÓN DE VALIDACIÓN
+    if data.email != "admin@gigpz.com" or data.password != "123456":
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+
+    token = create_access_token({"sub": data.email, "role": "user"})
+
+    return {"access_token": token, "token_type": "bearer"}
+
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(
+            credentials.credentials, "mi_super_secret_key_gigpz", algorithms=["HS256"]
+        )
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=403, detail="Token inválido")
+
+
+@app.get("/protected")
+def protected_route(user=Depends(verify_token)):
+    return {"message": "Ruta protegida", "user": user}
 
 
 @app.websocket("/chat/ws")
